@@ -1,68 +1,76 @@
 package metrics
 
 import (
-	"fmt"
 	"io"
-	"os"
 	"sync"
 	"testing"
 	"time"
-
-	"go.withmatt.com/metrics/internal/fasttime"
 )
 
 func TestTTLRace(t *testing.T) {
 	set := NewSet()
 	sv := set.NewSetVecWithTTL("example_label", time.Millisecond)
+
+	inactiveRead := make(chan struct{})
+	resumeExpiration := make(chan struct{})
 	sv.SetIsActive(func(s *Set) bool {
-		act, _ := s.GetMetricUint64("count")
-		fmt.Printf("active = %d\n", act)
-		return act > 0
+		active, _ := s.GetMetricUint64("count")
+		close(inactiveRead)
+		// Model the scraper being descheduled after reading the counter.
+		<-resumeExpiration
+		return active > 0
 	})
 	metric := sv.NewUint64Vec("count")
+	original := metric.WithLabelValues("a")
+	child := sv.WithLabelValue("a")
 
-	var lastM *Uint64
-	for i := range 10 {
-		fmt.Println("AAA")
-		var wg sync.WaitGroup
-
-		//fmt.Println("BBB")
-		//_, err := set.WritePrometheus(io.Discard)
-		//if err != nil {
-		//	t.Fatal(err)
-		//}
-		wg.Go(func() {
-			fmt.Println("CCC")
-			set.WritePrometheus(io.Discard)
-			fmt.Println("DDD")
-		})
-
-		var m1, m2 *Uint64
-		wg.Go(func() {
-			time.Sleep(10)
-			fmt.Println("EEE")
-			m1 = metric.WithLabelValues("a")
-			m1.Inc()
-			time.Sleep(2 * time.Millisecond)
-			m2 = metric.WithLabelValues("a")
-			m2.Dec()
-			fmt.Println("FFF")
-		})
-
-		wg.Wait()
-
-		if m1 != m2 {
-			t.Errorf("%d: %p != %p", i, m1, m2)
+	scraped := make(chan error, 1)
+	go func() {
+		_, err := set.WritePrometheus(io.Discard)
+		scraped <- err
+	}()
+	// Always release and join the scraper, including on a setup failure.
+	finishScrape := sync.OnceValue(func() error {
+		close(resumeExpiration)
+		return <-scraped
+	})
+	defer func() {
+		if err := finishScrape(); err != nil {
+			t.Errorf("WritePrometheus: %v", err)
 		}
-		if m1 != lastM {
-			t.Logf("%d: last %p != cur %p", i, lastM, m1)
-		}
-		lastM = m1
+	}()
+
+	select {
+	case <-inactiveRead:
+	case <-time.After(5 * time.Second):
+		t.Fatal("scraper did not reach the activity check")
 	}
 
-	for i := range 3 {
-		time.Sleep(time.Millisecond / 2)
-		fmt.Printf("%d // %d // %d\n", i, fasttime.Now(), time.Millisecond)
-		set.WritePrometheus(os.Stdout)
+	m1 := metric.WithLabelValues("a")
+	m1.Inc()
+	if m1 != original {
+		t.Fatal("counter changed before expiration resumed")
+	}
+
+	// WithLabelValues refreshed lastUsed. Let that refreshed TTL age while
+	// the scraper still holds its stale inactive result. The production
+	// fastClock ticks once per second, regardless of the configured TTL.
+	deadline := time.Now().Add(5 * time.Second)
+	for fastClock().Since(child.lastUsed.Load()) <= child.ttl {
+		if time.Now().After(deadline) {
+			t.Fatal("cached TTL clock did not advance")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	if err := finishScrape(); err != nil {
+		t.Fatalf("WritePrometheus: %v", err)
+	}
+
+	m2 := metric.WithLabelValues("a")
+	m2.Dec()
+	if m1 != m2 {
+		t.Fatalf("active counter expired: Inc used %p (value %d), Dec used %p (value %d)",
+			m1, m1.Get(), m2, m2.Get())
 	}
 }
