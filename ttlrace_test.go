@@ -5,99 +5,93 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"go.withmatt.com/metrics/internal/fasttime"
 )
 
 // Check for a race between the prometheus writer and an Inc().
 func TestTTLRace(t *testing.T) {
-	// Create a top level set with a 1ms TTL on each group of metrics with
-	// the same 'set_group_label'.
 	set := NewSet()
-	sv := set.NewSetVecWithTTL("set_group_label", time.Millisecond)
-
-	// We check a key metric to see if the group is active or idle.
-	inactiveRead := make(chan struct{})
-	resumeExpiration := make(chan struct{})
+	sv := set.NewSetVecWithTTL("set_group_label", 7*24*time.Hour)
 	sv.SetIsActive(func(s *Set) bool {
-		active, _ := s.GetMetricUint64("count")
-		// This is the sync point in RACER 1. At this point, we have a
-		// scalar value. In the race case, we get here while the
-		// counter is still 0.
-		close(inactiveRead)
-		<-resumeExpiration
-		// After the sync point, we check the (stale) count and
-		// incorrectly determine that this metric is NOT active.
+		active, _ := s.GetMetricUint64("counter")
 		return active > 0
 	})
 	metric := sv.NewUint64Vec("counter")
-
-	// Use the metric so that it exists.
 	original := metric.WithLabelValues("a")
-	original.Inc()
-	original.Dec()
-
-	// Normally, we don't need to use this directly. But in this case, we
-	// will use it later to help syncrhonize our two racing goroutines.
 	child := sv.WithLabelValue("a")
 
-	/// RACER 1 - METRICS SCRAPE
+	// Model a set that was idle for longer than the production TTL. This
+	// happens BEFORE the race; neither goroutine needs to pause for 7 days.
+	child.lastUsed.Store(fastClock().Now() - fasttime.Instant(child.ttl+time.Second))
+
+	expirationDecided := make(chan struct{})
+	resumeDeletion := make(chan struct{})
+	oldHook := testHookBeforeSetDelete
+	testHookBeforeSetDelete = func(s *Set) {
+		if s == child {
+			// RACER 1 has checked both activity and TTL, but has not
+			// deleted the set. Model descheduling at that exact point.
+			close(expirationDecided)
+			<-resumeDeletion
+		}
+	}
+	defer func() { testHookBeforeSetDelete = oldHook }()
+
+	// RACER 1: a scrape from GET /metrics.
 	scraped := make(chan error, 1)
 	go func() {
-		// In our app, this happens during a 'GET /metrics' request.
 		_, err := set.WritePrometheus(io.Discard)
 		scraped <- err
 	}()
-
-	// finishScrape() releases RACER 1.
 	finishScrape := sync.OnceValue(func() error {
-		close(resumeExpiration)
+		close(resumeDeletion)
 		return <-scraped
 	})
-	// Always release and join the scraper, including on a setup failure.
+	// Release and join before restoring the hook, even on setup failures.
 	defer func() {
 		if err := finishScrape(); err != nil {
 			t.Errorf("WritePrometheus: %v", err)
 		}
 	}()
 
-	// RACER 2 - Inc the count.
-
-	// Let the scraper get into the IsActive call on our metric SetVec.
 	select {
-	case <-inactiveRead:
+	case <-expirationDecided:
 	case <-time.After(5 * time.Second):
-		t.Fatal("scraper did not reach the activity check")
+		t.Fatal("precondition failed: scraper did not reach deletion of the expired set")
 	}
 
-	// When we inc the metric here, we get a counter from the set that
-	// RACER 1 is deleting.
+	// RACER 2: calls Inc() to count a new connection, then later calls
+	// Dec() when the connection closes.
+
+	// The WithLabelValues call here races with the metrics scrape. This is
+	// the only call that needs to happen while RACER 1 is descheduled.
 	m1 := metric.WithLabelValues("a")
-	m1.Inc()
 	if m1 != original {
-		t.Fatal("counter changed before expiration resumed")
+		t.Fatal("precondition failed: counter changed before deletion resumed")
 	}
 
-	// WithLabelValues refreshed lastUsed. Let that refreshed TTL age while
-	// the scraper still holds its stale inactive result. The production
-	// fastClock ticks once per second, regardless of the configured TTL.
-	deadline := time.Now().Add(5 * time.Second)
-	for fastClock().Since(child.lastUsed.Load()) <= child.ttl {
-		if time.Now().After(deadline) {
-			t.Fatal("cached TTL clock did not advance")
-		}
-		time.Sleep(time.Millisecond)
-	}
+	// The race condition has now occurred.
+	// + RACER 1 will delete the set.
+	// + RACER 2 will Inc() the old counter and Dec() the new one.
 
-	// Let RACER 1 continue.
 	if err := finishScrape(); err != nil {
-		t.Fatalf("WritePrometheus: %v", err)
+		t.Fatalf("precondition failed: WritePrometheus: %v", err)
 	}
 
-	// Later in RACER 2, we dec and get a new counter, not the one that we
-	// previously inc'ed.
+	m1.Inc()
+	if v := m1.Get(); v != 1 {
+		t.Errorf("precondition failed: want counter to be 1, got %d", v)
+	}
+
+	// Later in RACER 2, the decrement looks up the counter again.
 	m2 := metric.WithLabelValues("a")
 	m2.Dec()
 	if m1 != m2 {
-		t.Fatalf("active counter expired: Inc used %p (value %d), Dec used %p (value %d)",
-			m1, m1.Get(), m2, m2.Get())
+		t.Errorf("race failed and an active counter was expired: Inc used %p, Dec used %p",
+			m1, m2)
+	}
+	if v := m2.Get(); v != 0 {
+		t.Errorf("after Inc,Dec, want counter to be 0 but got %d", v)
 	}
 }
