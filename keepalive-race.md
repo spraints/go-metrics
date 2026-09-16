@@ -187,8 +187,9 @@ func (s *Set) tryKeepAlive() bool {
 Setting `touched` never clears `deleted`. Once marked deleted, the set stays
 retired and every subsequent renewal fails.
 
-Each set also has an `idleSince` timestamp, initialized at creation and managed
-by expiration checkers. It records when a checker last observed activity, not
+Each new set starts with `touched` set. Its first expiration check initializes
+the `idleSince` timestamp, which is managed by expiration checkers. It records
+when a checker last observed activity, not
 the actual time of the last `KeepAlive`. Protect this timestamp and the
 expiration protocol with a lock shared by all checkers of that set. Lookup and
 `KeepAlive` do not take that lock.

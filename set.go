@@ -469,10 +469,7 @@ func (s *Set) loadOrStoreSetFromVec(
 	set.id = hash
 	set.ttl = ttl
 	set.isActive = isActive
-	if ttl != 0 {
-		set.idleSince = fastClock().Now()
-	}
-	set.KeepAlive()
+	set.keepAliveState.Store(setTouched)
 	set.constantTags = joinTags(s.constantTags, Tag{
 		label: label,
 		value: MustValue(value),
