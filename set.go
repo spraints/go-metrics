@@ -486,10 +486,11 @@ func (s *Set) loadOrStoreSetFromVec(
 // KeepAlive returns true for Sets without a TTL. It does not prevent explicit
 // removal from a parent or keep ancestors alive.
 func (s *Set) KeepAlive() bool {
-	if s.ttl > 0 {
-		return s.keepAliveState.Or(setTouched)&setDeleted == 0
+	if s.ttl == 0 {
+		return true
 	}
-	return true
+	prevState := s.keepAliveState.Or(setTouched)
+	return prevState&setDeleted == 0
 }
 
 func (s *Set) loadOrStoreSet(newSet *Set) *Set {
