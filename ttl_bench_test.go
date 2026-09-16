@@ -50,6 +50,7 @@ func BenchmarkSetVecWithTTL(b *testing.B) {
 					b.RunParallel(func(pb *testing.PB) {
 						for pb.Next() {
 							// Include the same key-selection cost in both TTL modes.
+							//nolint:gosec // Benchmark inputs do not require secure randomness.
 							v.WithLabelValues(values[rand.IntN(len(values))])
 						}
 					})
@@ -66,8 +67,9 @@ func BenchmarkSetVecWithTTL(b *testing.B) {
 func BenchmarkWritePrometheusTTL(b *testing.B) {
 	const childCount = 256
 	const ttl = time.Hour
+	const expired = "expired"
 
-	for _, mode := range []string{"no_ttl", "idle", "active", "expired"} {
+	for _, mode := range []string{"no_ttl", "idle", "active", expired} {
 		b.Run(mode, func(b *testing.B) {
 			newFixture := func() *Set {
 				set := NewSet()
@@ -85,9 +87,10 @@ func BenchmarkWritePrometheusTTL(b *testing.B) {
 				for i := range childCount {
 					child := sv.WithLabelValue(strconv.Itoa(i))
 					child.NewUint64("count").Inc()
-					if mode == "active" || mode == "expired" {
-						// Active sets must survive even with an old timestamp.
-						child.lastUsed.Store(fastClock().Now() - fasttime.Instant(ttl+time.Second))
+					if mode == "active" || mode == expired {
+						// Model an earlier collection that observed no further activity.
+						child.keepAliveState.Store(0)
+						child.idleSince = fastClock().Now() - fasttime.Instant(ttl+time.Second)
 					}
 				}
 				return set
@@ -95,7 +98,7 @@ func BenchmarkWritePrometheusTTL(b *testing.B) {
 
 			set := newFixture()
 			var buf bytes.Buffer
-			if mode != "expired" {
+			if mode != expired {
 				// Warm the output buffer and metric ordering caches.
 				if _, err := set.WritePrometheusUnthrottled(&buf); err != nil {
 					b.Fatal(err)
@@ -103,7 +106,7 @@ func BenchmarkWritePrometheusTTL(b *testing.B) {
 			}
 			b.ReportAllocs()
 			for b.Loop() {
-				if mode == "expired" {
+				if mode == expired {
 					b.StopTimer()
 					set = newFixture()
 					b.StartTimer()
@@ -123,16 +126,16 @@ func BenchmarkWritePrometheusTTL(b *testing.B) {
 				return true
 			})
 			want := childCount
-			if mode == "expired" {
+			if mode == expired {
 				want = 0
 			}
 			if remaining != want {
 				b.Fatalf("remaining sets: got %d, want %d", remaining, want)
 			}
-			if mode == "expired" && buf.Len() != 0 {
+			if mode == expired && buf.Len() != 0 {
 				b.Fatal("expired sets were exported")
 			}
-			if mode != "expired" && buf.Len() == 0 {
+			if mode != expired && buf.Len() == 0 {
 				b.Fatal("live sets were not exported")
 			}
 		})

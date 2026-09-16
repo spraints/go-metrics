@@ -38,6 +38,8 @@ func (s *Set) NewSetVec(label string) *SetVec {
 }
 
 // NewSetVecWithTTL creates a new [SetVec] with the given label and TTL.
+// The TTL runs from when collection last observed activity. Expiration occurs
+// during collection, so an idle Set may remain registered longer than its TTL.
 // See [Set.KeepAlive] to manually keep a specific Set alive.
 func (s *Set) NewSetVecWithTTL(label string, ttl time.Duration) *SetVec {
 	sv := s.NewSetVec(label)
@@ -57,12 +59,18 @@ func (s *Set) NewSetVecWithTTL(label string, ttl time.Duration) *SetVec {
 func (sv *SetVec) WithLabelValue(value string) *Set {
 	hash := hashFinish(sv.partialHash, value)
 
-	set, ok := sv.s.setsByHash.Load(hash)
-	if !ok {
-		set = sv.s.loadOrStoreSetFromVec(hash, sv.ttl, sv.isActive, sv.label, value)
+	for {
+		set, ok := sv.s.setsByHash.Load(hash)
+		if !ok {
+			set = sv.s.loadOrStoreSetFromVec(hash, sv.ttl, sv.isActive, sv.label, value)
+		}
+		if set.KeepAlive() {
+			return set
+		}
+		// Help finish a pending expiration before retrying. The collector may
+		// be paused, and must not later remove our replacement for this key.
+		sv.s.setsByHash.CompareAndDelete(hash, set)
 	}
-	set.KeepAlive()
-	return set
 }
 
 // RemoveByLabelValue removes the Set for the corresponding label value.

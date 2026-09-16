@@ -1,3 +1,5 @@
+*NOTE: This document is out of date. It describes the state of the world at commit eb5d663cefcd3f48ca600ca0ad8c1a0af50515bd.*
+
 # KeepAlive can race with set expiration
 
 `Set.KeepAlive()` updates `lastUsed`, but does not coordinate with removal from

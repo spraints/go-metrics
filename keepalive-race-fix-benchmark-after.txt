@@ -1,0 +1,129 @@
+# Source commit: 196c908cd12ba510d482fb81e3d338a6ef0a44a2
+# Toolchain: go version go1.25.0 darwin/arm64
+# Command: go test -run ^$ -bench TTL$ -benchmem -benchtime=300ms -count=10 .
+goos: darwin
+goarch: arm64
+pkg: go.withmatt.com/metrics
+cpu: Apple M4 Pro
+BenchmarkSetVecWithTTL/no_ttl/serial-14         	11304297	        31.26 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/serial-14         	12567052	        29.59 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/serial-14         	12234164	        29.82 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/serial-14         	12444367	        29.79 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/serial-14         	12549693	        29.57 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/serial-14         	12307148	        29.87 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/serial-14         	12127948	        29.54 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/serial-14         	11989326	        29.79 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/serial-14         	11792548	        30.02 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/serial-14         	11968647	        30.01 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1-14         	98114912	         3.171 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1-14         	100000000	         3.263 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1-14         	97558754	         3.232 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1-14         	100000000	         3.266 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1-14         	100000000	         3.233 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1-14         	100000000	         3.346 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1-14         	97810591	         3.270 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1-14         	100000000	         3.201 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1-14         	100000000	         3.315 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1-14         	94980541	         3.380 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=64-14        	81299288	         4.016 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=64-14        	89882029	         3.808 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=64-14        	83967462	         3.949 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=64-14        	91230655	         3.866 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=64-14        	90261373	         3.943 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=64-14        	86856866	         3.749 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=64-14        	88744640	         3.714 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=64-14        	84858127	         4.075 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=64-14        	95518522	         4.095 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=64-14        	95210816	         4.000 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1024-14      	64309634	         5.301 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1024-14      	62844136	         5.308 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1024-14      	65428266	         5.562 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1024-14      	64620355	         5.213 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1024-14      	64510833	         5.298 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1024-14      	64782176	         5.545 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1024-14      	63564460	         5.291 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1024-14      	66622966	         5.318 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1024-14      	61084244	         5.337 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/no_ttl/parallel/keys=1024-14      	62113590	         5.359 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/serial-14                     	11404976	        31.61 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/serial-14                     	11396432	        31.50 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/serial-14                     	10820071	        31.88 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/serial-14                     	11419825	        31.84 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/serial-14                     	11406241	        31.73 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/serial-14                     	10842271	        31.92 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/serial-14                     	11381419	        31.77 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/serial-14                     	11354004	        31.61 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/serial-14                     	10785465	        31.82 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/serial-14                     	11363739	        31.89 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1-14            	 5250124	        68.30 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1-14            	 5346242	        68.25 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1-14            	 5260369	        68.03 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1-14            	 5272400	        65.16 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1-14            	 5273305	        67.92 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1-14            	 5244452	        68.35 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1-14            	 5253712	        67.26 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1-14            	 5213424	        68.17 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1-14            	 5265177	        68.62 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1-14            	 5751574	        67.88 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=64-14           	28727223	        12.81 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=64-14           	27665794	        12.67 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=64-14           	27792878	        12.60 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=64-14           	28212519	        13.01 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=64-14           	26883559	        12.58 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=64-14           	28490967	        12.61 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=64-14           	28024197	        13.02 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=64-14           	28319512	        12.55 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=64-14           	28153407	        12.43 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=64-14           	28059963	        12.89 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1024-14         	29534118	        12.12 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1024-14         	29016853	        12.34 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1024-14         	28707751	        12.49 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1024-14         	29586812	        12.10 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1024-14         	29048850	        12.41 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1024-14         	28216665	        12.36 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1024-14         	28009842	        12.17 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1024-14         	29250753	        12.44 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1024-14         	28598287	        12.37 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetVecWithTTL/ttl/parallel/keys=1024-14         	29478193	        12.30 ns/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/no_ttl-14                    	   20593	     17470 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/no_ttl-14                    	   20268	     17523 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/no_ttl-14                    	   20319	     17767 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/no_ttl-14                    	   20725	     17350 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/no_ttl-14                    	   20042	     17823 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/no_ttl-14                    	   20635	     17478 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/no_ttl-14                    	   20473	     17780 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/no_ttl-14                    	   20914	     17084 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/no_ttl-14                    	   20269	     17742 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/no_ttl-14                    	   20412	     17715 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/idle-14                      	   19004	     18961 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/idle-14                      	   18595	     19126 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/idle-14                      	   18510	     19475 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/idle-14                      	   19090	     18851 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/idle-14                      	   18786	     19111 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/idle-14                      	   18769	     19383 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/idle-14                      	   18459	     19487 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/idle-14                      	   18963	     19069 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/idle-14                      	   18856	     19246 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/idle-14                      	   18756	     19143 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/active-14                    	   16081	     22424 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/active-14                    	   16065	     22629 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/active-14                    	   16000	     22495 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/active-14                    	   16070	     22453 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/active-14                    	   16028	     22716 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/active-14                    	   16143	     22274 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/active-14                    	   16177	     22347 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/active-14                    	   16123	     22561 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/active-14                    	   15955	     22508 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/active-14                    	   16020	     22446 ns/op	       256.0 sets/op	       0 B/op	       0 allocs/op
+BenchmarkWritePrometheusTTL/expired-14                   	   21315	     16866 ns/op	       256.0 sets/op	     161 B/op	       1 allocs/op
+BenchmarkWritePrometheusTTL/expired-14                   	   21002	     17082 ns/op	       256.0 sets/op	     161 B/op	       1 allocs/op
+BenchmarkWritePrometheusTTL/expired-14                   	   20852	     17226 ns/op	       256.0 sets/op	     161 B/op	       1 allocs/op
+BenchmarkWritePrometheusTTL/expired-14                   	   20484	     17459 ns/op	       256.0 sets/op	     161 B/op	       1 allocs/op
+BenchmarkWritePrometheusTTL/expired-14                   	   21168	     17005 ns/op	       256.0 sets/op	     161 B/op	       1 allocs/op
+BenchmarkWritePrometheusTTL/expired-14                   	   20767	     17048 ns/op	       256.0 sets/op	     161 B/op	       1 allocs/op
+BenchmarkWritePrometheusTTL/expired-14                   	   21217	     16889 ns/op	       256.0 sets/op	     161 B/op	       1 allocs/op
+BenchmarkWritePrometheusTTL/expired-14                   	   21242	     16921 ns/op	       256.0 sets/op	     161 B/op	       1 allocs/op
+BenchmarkWritePrometheusTTL/expired-14                   	   21256	     16963 ns/op	       256.0 sets/op	     161 B/op	       1 allocs/op
+BenchmarkWritePrometheusTTL/expired-14                   	   21378	     16781 ns/op	       256.0 sets/op	     161 B/op	       1 allocs/op
+PASS
+ok  	go.withmatt.com/metrics	67.595s
