@@ -170,18 +170,25 @@ func (s *Set) setConstantTags(previousConstantTags string, constantTags ...strin
 // Reset resets the Set and retains allocated memory for reuse.
 //
 // Reset retains any ConstantTags if set.
-func (s *Set) Reset() {
-	defer s.KeepAlive()
-
+//
+// Returns false if this Set has expired.
+func (s *Set) Reset() bool {
 	s.metrics.Clear()
 	s.setsByHash.Clear()
 	s.unorderedSets.Clear()
 	s.collectors.Store(nil)
+
+	return s.KeepAlive()
+
 }
 
 // NewSet creates a new child Set in s.
 // This will panic if constant tags are not unique within the parent Set. If
 // no constant tags are provided, this will never fail.
+//
+// This is not completely race free: If s has a TTL and is expired, a
+// concurrent call to WritePrometheus or SetVec.WithLabelValues might end up
+// removing s from its parent.
 func (s *Set) NewSet(constantTags ...string) *Set {
 	defer s.KeepAlive()
 
@@ -411,9 +418,12 @@ func (s *Set) mustStoreSet(set *Set) {
 }
 
 // mustStoreMetric adds a new Metric, and will panic if the metric already has
-// been registered.
+// been registered or if the set is expired.
 func (s *Set) mustStoreMetric(m Metric, name MetricName) {
-	defer s.KeepAlive()
+	if !s.KeepAlive() {
+		panic("Set expired")
+	}
+
 	nm := &namedMetric{
 		id:     getHashTags(name.Family.String(), name.Tags),
 		name:   name,
