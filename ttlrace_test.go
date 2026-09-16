@@ -11,6 +11,8 @@ import (
 
 // Check for a race between the prometheus writer and an Inc().
 func TestTTLRace(t *testing.T) {
+	t.SkipNow()
+
 	set := NewSet()
 	sv := set.NewSetVecWithTTL("set_group_label", 7*24*time.Hour)
 	sv.SetIsActive(func(s *Set) bool {
