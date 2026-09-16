@@ -2,9 +2,8 @@ package metrics
 
 import (
 	"bytes"
-	"runtime"
+	"math/rand/v2"
 	"strconv"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,34 +33,24 @@ func BenchmarkSetVecLookup(b *testing.B) {
 				}
 			})
 
-			for _, shared := range []bool{true, false} {
-				name := "parallel_distinct"
-				if shared {
-					name = "parallel_shared"
-				}
-				b.Run(name, func(b *testing.B) {
+			for _, keyCount := range []int{1, 64, 1024} {
+				b.Run("parallel/keys="+strconv.Itoa(keyCount), func(b *testing.B) {
 					set := NewSet()
 					v := set.NewSetVecWithTTL("group", tc.ttl).NewUint64Vec("count")
-					// RunParallel defaults to one worker per GOMAXPROCS.
-					// Prepopulate the same entries in both parallel cases.
-					values := make([]string, runtime.GOMAXPROCS(0))
+					// Every worker samples the same populated key space. Larger
+					// spaces model many keys with occasional overlapping lookups.
+					values := make([]string, keyCount)
 					for i := range values {
 						values[i] = strconv.Itoa(i)
 						v.WithLabelValues(values[i])
 					}
-					var nextWorker atomic.Uint64
 
 					b.ReportAllocs()
 					b.ResetTimer()
 					b.RunParallel(func(pb *testing.PB) {
-						// Assign once per worker, outside the lookup loop.
-						i := int(nextWorker.Add(1) - 1)
-						if shared {
-							i = 0
-						}
-						value := values[i]
 						for pb.Next() {
-							v.WithLabelValues(value)
+							// Include the same key-selection cost in both TTL modes.
+							v.WithLabelValues(values[rand.IntN(len(values))])
 						}
 					})
 				})
