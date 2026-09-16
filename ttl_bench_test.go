@@ -10,10 +10,10 @@ import (
 	"go.withmatt.com/metrics/internal/fasttime"
 )
 
-// BenchmarkSetVecLookup measures existing-label lookups, without a counter
+// BenchmarkSetVecWithTTL measures existing-label lookups, without a counter
 // increment that would introduce a second source of contention. Both TTL modes
 // go through SetVec so the comparison isolates the renewal cost.
-func BenchmarkSetVecLookup(b *testing.B) {
+func BenchmarkSetVecWithTTL(b *testing.B) {
 	for _, tc := range []struct {
 		name string
 		ttl  time.Duration
