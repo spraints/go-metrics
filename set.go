@@ -97,18 +97,23 @@ type Set struct {
 	// Children sets inherit these base tags.
 	constantTags string
 
+	// ttl defines the amount of time that we keep around idle
+	// sets of metrics. If this is not set, sets are never expired.
 	ttl time.Duration
-	// keepAliveState is shared with lookups. Once setDeleted is set, it is
-	// never cleared, even by subsequent KeepAlive calls.
+	// isActive is an optional callback to determine if this Set should be
+	// kept alive. If set, it will be called during expiration checks.
+	isActive IsActiveFunc
+	// keepAliveState is shared between expiration routines and lookups.
+	// - setTouched is set when a lookup gets a set and cleared when an
+	//   expiration routine thinks it's ok to delete the set.
+	// - setDeleted is set when an expiration routine is going to delete
+	//   the set.
 	keepAliveState atomic.Uint32
-	// expirationMu serializes expiration checks, including clearing setTouched.
-	// idleSince records when a check last observed activity, not its actual time.
+	// expirationMu serializes expiration checks, including clearing
+	// setTouched. idleSince records when a check last observed activity,
+	// not the actual time of last activity.
 	expirationMu sync.Mutex
 	idleSince    fasttime.Instant
-
-	// isActive is an optional callback to determine if this Set should be kept alive.
-	// If set, it will be called during expiration checks.
-	isActive IsActiveFunc
 }
 
 // NewSet creates new set of metrics.
