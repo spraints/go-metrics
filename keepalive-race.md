@@ -74,64 +74,24 @@ from that parent's scrapes.
 These are all internal calls to `Set.KeepAlive()` in the current implementation.
 `runtime.KeepAlive` in `unique_ident.go` is unrelated.
 
+The classifications below assume a TTL of at least one hour and a time to
+return and use a set much shorter than that TTL. They cover expiration of the
+set being refreshed, excluding explicit removal and stale deletion of a
+replacement under the same key. An existing set can already be old enough to
+expire; a freshly created set cannot.
+
 | Caller | What it refreshes and returns | Exposure to concurrent deletion |
 | --- | --- | --- |
-| [`SetVec.WithLabelValue`](set_vec.go) | Refreshes the set returned by `Load` or `loadOrStoreSetFromVec`, then returns `*Set`. | Direct race above: the set can be deleted before, during, or after the refresh and still be returned. |
-| [`Set.loadOrStoreSetFromVec`](set.go) | Refreshes a new candidate before publishing it, then returns the result of `loadOrStoreSet`. | `LoadOrStore` can return an existing set instead of the refreshed candidate. That existing set may already have a pending expiration deletion. The outer `WithLabelValue` refreshes the returned set, but does not make it safe from that deletion. A newly published candidate can also be removed by an explicit removal or a stale deletion for the same key. |
-| [`Set.NewSet`](set.go) | Defers `s.KeepAlive()` on the **parent receiver**, then returns a newly registered child. | If `s` is itself a TTL set, its parent can already have decided to delete it. The returned child then belongs to a detached subtree despite the deferred refresh of `s`. |
-| [`Set.mustStoreMetric`](set.go) | Defers a refresh of the receiver while registering a metric; the public constructor returns that metric. | Registration can succeed on a set that is concurrently removed from its parent. The caller receives a metric in a detached set. |
-| [`Set.Reset`](set.go) | Clears the receiver's contents and defers a refresh of the receiver; returns no value. | A caller holding a TTL set can reset and reuse it even though its parent concurrently deletes it. The refresh does not restore parent membership. |
-| [`Set.isExpired`](set.go), active branch | Refreshes the receiver when `isActive` returns true, then returns false. | This expiration check preserves the set, but another concurrent traversal may have already decided to delete it. The active result does not cancel that other traversal's deletion. |
+| [`SetVec.WithLabelValue`](set_vec.go) | Refreshes the set returned by `Load` or `loadOrStoreSetFromVec`, then returns `*Set`. | **At risk** when `Load` returns an existing, expiration-eligible set: a scraper can already have decided to delete it before the refresh. The creation path is not at risk under these timing assumptions. |
+| [`Set.loadOrStoreSetFromVec`](set.go) | Refreshes a new candidate before publishing it, then returns the result of `loadOrStoreSet`. | **Not at risk** under these timing assumptions. Its caller has just observed a missing entry. It either publishes its fresh candidate or receives a set created by a competing caller since that miss. Neither can age through an hour-long TTL before return and use. The latter is an existing map entry, but is still newly created for this purpose. |
+| [`Set.NewSet`](set.go) | Defers `s.KeepAlive()` on the **parent receiver**, then returns a newly registered child. | **At risk** if the parent receiver `s` is an existing, expiration-eligible TTL set. Its parent may already have decided to delete it, detaching the returned child's whole subtree. The new child itself is not old enough to expire; the refresh here is on the older parent. |
+| [`Set.mustStoreMetric`](set.go) | Defers a refresh of the receiver while registering a metric; the public constructor returns that metric. | **At risk** if the receiver is an existing, expiration-eligible TTL set. A pending deletion can detach it despite the refresh, leaving the returned metric in a detached set. Registering on a fresh set is not at risk under these timing assumptions. |
+| [`Set.Reset`](set.go) | Clears the receiver's contents and defers a refresh of the receiver; returns no value. | **At risk** if the receiver is an existing, expiration-eligible TTL set. Resetting its contents does not cancel a pending deletion from its parent, so the caller can reuse a detached set. |
+| [`Set.isExpired`](set.go), active branch | Refreshes the receiver when `isActive` returns true, then returns false. | **At risk** with concurrent expiration checks: another traversal may already have observed this older set as inactive and expired before it became active. This refresh does not cancel that traversal's pending deletion. This invocation itself returns false and does not delete the set. |
 
 External callers can also call the public `Set.KeepAlive()` directly on a held
 pointer. It has the same limitation: it only stores a timestamp when the TTL is
 positive, and cannot guarantee that the set remains registered during later use.
-
-### APIs that inherit these paths
-
-For vectors created through a `SetVec`, `WithLabelValues` first calls
-`SetVec.WithLabelValue` and then accesses the returned set's metrics:
-
-- `Uint64Vec`, `Int64Vec`, and `Float64Vec` in [counter_vec.go](counter_vec.go).
-- `HistogramVec` in [histogram_vec.go](histogram_vec.go).
-- `FixedHistogramVec` in [fixedhistogram_vec.go](fixedhistogram_vec.go).
-
-The direct `SetVec` constructors `NewUint64`, `NewCounter`, `NewInt64`,
-`NewFloat64`, `NewHistogram`, and `NewFixedHistogram` also use
-`WithLabelValue`, then register a metric on the returned set.
-
-`mustStoreMetric` is used by the numeric constructors in
-[counter.go](counter.go), the function metric constructors in [func.go](func.go),
-and the constructors in [histogram.go](histogram.go) and
-[fixedhistogram.go](fixedhistogram.go). Each can return a metric whose containing
-TTL set has been concurrently detached.
-
-Vectors created directly on a `Set` retain that set pointer. Their metric
-lookups do not call `SetVec.WithLabelValue` or refresh its TTL; retaining the
-vector or a metric pointer does not keep the set registered. Likewise,
-refreshing a child does not recursively refresh its ancestors.
-
-## Removal paths and scope
-
-`rangeChildrenSets` performs expiration and deletion during both Prometheus
-write variants and `Collect`. It has the same check-then-delete structure for
-`unorderedSets`, although public TTL set creation through `SetVec` uses
-`setsByHash`.
-
-There is also a related replacement hazard: `setsByHash.Delete(key)` does not
-check that the current value is the child inspected by the traversal. If one
-scraper pauses after deciding to expire a set, another removes it, and an
-application creates a replacement under the same key, the first scraper can
-delete the replacement. `CompareAndDelete(key, child)` would address that
-identity mismatch, but by itself would not prevent deletion of the original
-child after a successful `KeepAlive`.
-
-Explicit `SetVec.RemoveByLabelValue` and `Set.UnregisterSet` also delete entries
-without coordinating with `KeepAlive`. `Set.Reset` clears child collections.
-These intentional removals can leave outstanding pointers detached without
-requiring an expiration decision. `AppendConstantTags` deletes and reinserts
-children, but is explicitly documented as not thread-safe and restricted to
-initial setup; concurrent use is outside its supported contract.
 
 ## Reproduction
 
