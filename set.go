@@ -11,12 +11,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.withmatt.com/metrics/internal/atomicx"
 	"go.withmatt.com/metrics/internal/fasttime"
 	"go.withmatt.com/metrics/internal/syncx"
 )
 
 const minimumWriteBuffer = 16 * 1024
+
+const (
+	setTouched uint32 = 1 << iota
+	setDeleted
+)
 
 var defaultSet = newSet()
 
@@ -93,12 +97,23 @@ type Set struct {
 	// Children sets inherit these base tags.
 	constantTags string
 
-	ttl      time.Duration
-	lastUsed atomicx.Instant
-
-	// isActive is an optional callback to determine if this Set should be kept alive.
-	// If set, it will be called during expiration checks.
+	// ttl defines the amount of time that we keep around idle
+	// sets of metrics. If this is not set, sets are never expired.
+	ttl time.Duration
+	// isActive is an optional callback to determine if this Set should be
+	// kept alive. If set, it will be called during expiration checks.
 	isActive IsActiveFunc
+	// keepAliveState is shared between expiration routines and lookups.
+	// - setTouched is set when a lookup gets a set and cleared when an
+	//   expiration routine thinks it's ok to delete the set.
+	// - setDeleted is set when an expiration routine is going to delete
+	//   the set.
+	keepAliveState atomic.Uint32
+	// expirationMu serializes expiration checks, including clearing
+	// setTouched. idleSince records when a check last observed activity,
+	// not the actual time of last activity.
+	expirationMu sync.Mutex
+	idleSince    fasttime.Instant
 }
 
 // NewSet creates new set of metrics.
@@ -155,18 +170,25 @@ func (s *Set) setConstantTags(previousConstantTags string, constantTags ...strin
 // Reset resets the Set and retains allocated memory for reuse.
 //
 // Reset retains any ConstantTags if set.
-func (s *Set) Reset() {
-	defer s.KeepAlive()
-
+//
+// Returns false if this Set has expired.
+func (s *Set) Reset() bool {
 	s.metrics.Clear()
 	s.setsByHash.Clear()
 	s.unorderedSets.Clear()
 	s.collectors.Store(nil)
+
+	return s.KeepAlive()
+
 }
 
 // NewSet creates a new child Set in s.
 // This will panic if constant tags are not unique within the parent Set. If
 // no constant tags are provided, this will never fail.
+//
+// This is not completely race free: If s has a TTL and is expired, a
+// concurrent call to WritePrometheus or SetVec.WithLabelValues might end up
+// removing s from its parent.
 func (s *Set) NewSet(constantTags ...string) *Set {
 	defer s.KeepAlive()
 
@@ -289,6 +311,13 @@ func (s *Set) writePrometheus(w io.Writer, throttle bool) (int, error) {
 	return bb.Len(), nil
 }
 
+// testHookBeforeSetDelete synchronizes expiration race tests. Set it only
+// before starting collection, and restore it after collection has finished.
+var testHookBeforeSetDelete func(*Set)
+
+// testHookBeforeSetExpire pauses a check before it attempts to claim expiration.
+var testHookBeforeSetExpire func(*Set)
+
 // rangeChildrenSets iterates over all child sets with a single
 // callback function. rangeChildrenSets also maintains expiration
 // and deletes expired sets if applicable.
@@ -296,7 +325,10 @@ func (s *Set) rangeChildrenSets(f func(s *Set) bool) {
 	keepGoing := true
 	s.setsByHash.Range(func(key metricHash, child *Set) bool {
 		if child.isExpired() {
-			s.setsByHash.Delete(key)
+			if testHookBeforeSetDelete != nil {
+				testHookBeforeSetDelete(child)
+			}
+			s.setsByHash.CompareAndDelete(key, child)
 			return true
 		}
 		keepGoing = f(child)
@@ -347,13 +379,29 @@ func (s *Set) isExpired() bool {
 		return false
 	}
 
-	// Check if user considers this Set "active"
-	if s.isActive != nil && s.isActive(s) {
-		s.KeepAlive() // Bump lastUsed since it's active
-		return false  // Don't expire while active
+	s.expirationMu.Lock()
+	defer s.expirationMu.Unlock()
+
+	// A lookup may set setTouched again immediately after this operation.
+	// Only the final CAS can claim expiration; never clear activity twice.
+	state := s.keepAliveState.And(^setTouched)
+	if state&setDeleted != 0 {
+		return true
 	}
 
-	return fastClock().Since(s.lastUsed.Load()) > s.ttl
+	active := s.isActive != nil && s.isActive(s)
+	now := fastClock().Now()
+	if state&setTouched != 0 || active {
+		s.idleSince = now
+		return false
+	}
+	if now.Sub(s.idleSince) <= s.ttl {
+		return false
+	}
+	if testHookBeforeSetExpire != nil {
+		testHookBeforeSetExpire(s)
+	}
+	return s.keepAliveState.CompareAndSwap(0, setDeleted)
 }
 
 // mustStoreSet adds a new Set, and will panic if the set has already been registered.
@@ -370,9 +418,12 @@ func (s *Set) mustStoreSet(set *Set) {
 }
 
 // mustStoreMetric adds a new Metric, and will panic if the metric already has
-// been registered.
+// been registered or if the set is expired.
 func (s *Set) mustStoreMetric(m Metric, name MetricName) {
-	defer s.KeepAlive()
+	if !s.KeepAlive() {
+		panic("Set expired")
+	}
+
 	nm := &namedMetric{
 		id:     getHashTags(name.Family.String(), name.Tags),
 		name:   name,
@@ -428,7 +479,7 @@ func (s *Set) loadOrStoreSetFromVec(
 	set.id = hash
 	set.ttl = ttl
 	set.isActive = isActive
-	set.KeepAlive()
+	set.keepAliveState.Store(setTouched)
 	set.constantTags = joinTags(s.constantTags, Tag{
 		label: label,
 		value: MustValue(value),
@@ -436,11 +487,20 @@ func (s *Set) loadOrStoreSetFromVec(
 	return s.loadOrStoreSet(set)
 }
 
-// KeepAlive is used to bump a Set's expiration when a TTL is set.
-func (s *Set) KeepAlive() {
-	if s.ttl > 0 {
-		s.lastUsed.Store(fastClock().Now())
+// KeepAlive records activity when a TTL is set. It returns false if the Set
+// has already expired; an expired Set cannot be revived. SetVec lookups retry
+// automatically, but callers holding a Set directly must obtain a new Set.
+//
+// Expiration checks start a fresh TTL when they observe this activity, so the
+// Set can remain registered longer than one TTL after its actual last use.
+// KeepAlive returns true for Sets without a TTL. It does not prevent explicit
+// removal from a parent or keep ancestors alive.
+func (s *Set) KeepAlive() bool {
+	if s.ttl == 0 {
+		return true
 	}
+	prevState := s.keepAliveState.Or(setTouched)
+	return prevState&setDeleted == 0
 }
 
 func (s *Set) loadOrStoreSet(newSet *Set) *Set {
